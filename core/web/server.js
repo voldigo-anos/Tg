@@ -7,6 +7,7 @@
  */
 
 import http     from 'http';
+import https    from 'https';
 import fs       from 'fs-extra';
 import path     from 'path';
 import TelegramBot from 'node-telegram-bot-api';
@@ -96,9 +97,9 @@ async function hotStartBotFromWeb(token) {
   );
 
   const nextIndex = (global.Reze?.bots?.length || 0) + 1;
-  global.Reze.bots.push({ bot, username: me.username, index: nextIndex, token });
+  global.Reze.bots.push({ bot, username: me.username, index: nextIndex, token, userId: me.id });
   global.Reze?.log?.commands(`[Web] Hot-started @${me.username} as bot #${nextIndex}`);
-  return { username: me.username, index: nextIndex };
+  return { username: me.username, index: nextIndex, userId: me.id };
 }
 
 async function hotStopBotFromWeb(token) {
@@ -201,7 +202,7 @@ async function router(req, res) {
       eventCount:    getEventsData().length,
       uptimeHistory: global.Reze?.uptimeHistory || [],
       botCount:      bots.length,
-      bots:          bots.map(b => ({ username: b.username, index: b.index })),
+      bots:          bots.map(b => ({ username: b.username, index: b.index, userId: b.userId ?? null })),
       prefix:        config.prefix || '/',
       subprefix:     config.subprefix || [],
       timezone:      config.timezone || 'UTC',
@@ -233,6 +234,7 @@ async function router(req, res) {
         live:     !!live,
         username: live ? live.username : null,
         botIndex: live ? live.index : null,
+        userId:   live ? (live.userId ?? null) : null,
       };
     }));
   }
@@ -302,6 +304,44 @@ async function router(req, res) {
       username: stoppedUsername,
       remaining: tokens.length,
     });
+  }
+
+  // GET /api/bot-photo?id=<userId> — proxy the bot's Telegram profile photo
+  if (url === '/api/bot-photo' && method === 'GET') {
+    const userId = new URLSearchParams(req.url.split('?')[1] || '').get('id');
+    if (!userId) return json(res, { ok: false, error: 'Missing id param.' }, 400);
+
+    const bots = global.Reze?.bots || [];
+    const entry = bots.find(b => String(b.userId) === String(userId));
+    if (!entry) return json(res, { ok: false, error: 'Bot not found.' }, 404);
+
+    try {
+      const photos = await entry.bot.getUserProfilePhotos(userId, { limit: 1 });
+      if (!photos.total_count || !photos.photos?.[0]?.[0]) {
+        res.writeHead(404);
+        return res.end('No profile photo.');
+      }
+
+      // Pick the largest available size (last in the sizes array)
+      const sizes  = photos.photos[0];
+      const best   = sizes[sizes.length - 1];
+      const fileLink = await entry.bot.getFileLink(best.file_id);
+
+      // Proxy the image through our server so the Telegram token is never
+      // exposed to the browser.
+      https.get(fileLink, (imgRes) => {
+        res.writeHead(200, {
+          'Content-Type':  imgRes.headers['content-type'] || 'image/jpeg',
+          'Cache-Control': 'public, max-age=300',   // cache 5 min in browser
+        });
+        imgRes.pipe(res);
+      }).on('error', () => {
+        if (!res.headersSent) { res.writeHead(502); res.end('Photo fetch failed.'); }
+      });
+    } catch (err) {
+      if (!res.headersSent) json(res, { ok: false, error: err.message }, 500);
+    }
+    return; // response handled asynchronously above
   }
 
   res.writeHead(404);

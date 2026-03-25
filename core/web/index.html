@@ -1124,18 +1124,29 @@ function renderStatus(s) {
     card.style.display = '';
     document.getElementById('bot-instances-count').textContent = `${s.bots.length} running`;
     const list = document.getElementById('bot-instances-list');
-    list.innerHTML = s.bots.map((b, i) => `
+    list.innerHTML = s.bots.map((b, i) => {
+      const photoSrc = b.userId ? `/api/bot-photo?id=${b.userId}` : '';
+      const avatarHtml = photoSrc
+        ? `<img src="${photoSrc}" alt="@${b.username}"
+               style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid var(--blue);flex-shrink:0"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+            />
+           <div style="display:none;width:36px;height:36px;background:var(--blue-dim);border-radius:50%;align-items:center;justify-content:center;flex-shrink:0">
+             <span class='material-icons-round' style='font-size:16px;color:var(--blue)'>smart_toy</span>
+           </div>`
+        : `<div style="width:36px;height:36px;background:var(--blue-dim);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+             <span class='material-icons-round' style='font-size:16px;color:var(--blue)'>smart_toy</span>
+           </div>`;
+      return `
       <div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid rgba(30,30,30,0.5)">
-        <div style="width:28px;height:28px;background:var(--blue-dim);border-radius:6px;display:flex;align-items:center;justify-content:center">
-          <span class="material-icons-round" style="font-size:14px;color:var(--blue)">smart_toy</span>
-        </div>
+        ${avatarHtml}
         <div>
           <div style="font-family:var(--mono);font-size:12px;color:var(--text)">@${b.username || 'unknown'}</div>
           <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">Instance #${b.index}</div>
         </div>
         <div style="margin-left:auto"><span class="badge badge-anyone">ONLINE</span></div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   }
 
   const si = document.getElementById('sysinfo-list');
@@ -1303,15 +1314,23 @@ function renderTokens(tokens) {
   tokens.forEach((t, i) => {
     const item = document.createElement('div');
     item.className = 'token-item';
-    const statusColor = t.live ? 'var(--green)' : 'var(--text-dim)';
-    const statusIcon  = t.live ? 'wifi' : 'wifi_off';
     const statusLabel = t.live
       ? `🟢 Online${t.username ? ' · @' + t.username : ''}`
       : '⭕ Not running';
+    const photoSrc = (t.live && t.userId) ? `/api/bot-photo?id=${t.userId}` : '';
+    const avatarHtml = photoSrc
+      ? `<img src="${photoSrc}" alt="@${t.username}"
+             style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1.5px solid var(--green);flex-shrink:0"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+          />
+         <div style="display:none;width:28px;height:28px;background:var(--green-dim);border-radius:50%;align-items:center;justify-content:center;flex-shrink:0">
+           <span class='material-icons-round' style='font-size:13px;color:var(--green)'>smart_toy</span>
+         </div>`
+      : `<div class="token-item-icon" style="background:${t.live ? 'var(--green-dim)' : 'var(--bg-card)'}">
+           <span class="material-icons-round" style="color:${t.live ? 'var(--green)' : 'var(--text-dim)'}">smart_toy</span>
+         </div>`;
     item.innerHTML = `
-      <div class="token-item-icon" style="background:${t.live ? 'var(--green-dim)' : 'var(--bg-card)'}">
-        <span class="material-icons-round" style="color:${statusColor}">${statusIcon}</span>
-      </div>
+      ${avatarHtml}
       <div class="token-item-info">
         <div class="token-item-label">${t.masked}</div>
         <div class="token-item-meta">Bot #${i+1} · ${statusLabel}</div>

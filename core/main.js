@@ -568,7 +568,7 @@ async function startBot(token, index) {
 	bot.on('message_reaction', rxn => handlerAction({ message_reaction: rxn }));
 	bot.on('polling_error',    err => log.error(`Polling error (bot #${index}): ${err.message}`));
 
-	global.Reze.bots.push({ bot, username: me.username, index });
+	global.Reze.bots.push({ bot, username: me.username, index, token, userId: me.id });
 	header('REZE SERVER ONLINE', chalk.bold.green);
 	log.login(`Bot #${index} @${me.username} is online`);
 	return bot;
