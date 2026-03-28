@@ -200,8 +200,8 @@ Reactions apply to both `onStart` and `onReply` handlers. On failure, 🤔 fires
 | `/venice` | veniceai, ven, ai | Venice AI chat | anyone |
 | `/pollinations` | polli, poli | AI image generation | anyone |
 | `/prefix` | setprefix, pref | View or change command prefix | anyone |
-| `/requestvip` | reqvip, viprequest | Request VIP/premium access | anyone |
-| `/vip` | — | Manage VIP users | developer |
+| `/requestpremium` | reqpremium, premiumrequest | Request Premium access | anyone |
+| `/premium` | prem | Manage Premium users | developer |
 | `/dev` | — | Manage developer list | developer |
 | `/devmode` | — | Toggle maintenance mode | developer |
 | `/devname` | — | Set the developer display name | developer |
