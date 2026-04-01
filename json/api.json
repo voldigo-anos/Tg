@@ -1,8 +1,9 @@
 {
   "openweather": "",
-  "shin": "",
+  "ajiro": "https://ajiro-apis.up.railway.app",
   "nekolabs": "https://rynekoo-api.hf.space",
   "nexray": "https://api.nexray.web.id",
   "deline": "https://api.deline.web.id",
-  "danzy": "https://api.danzy.web.id"
+  "danzy": "https://api.danzy.web.id",
+  "betadash": "https://betadash-api-swordslush-production.up.railway.app"
 }

@@ -247,110 +247,16 @@ function buildSystemPrompt(profile = null, hint = null) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//   SIMILARITY ENGINE
+//   DYNAMIC INTENT SIMILARITY ENGINE (fully dynamic — no manual list required)
 // ─────────────────────────────────────────────────────────────────────────────
-
-const INTENT_MAP = [
-	// dice
-	['roll dice', 'dice'],        ['roll the dice', 'dice'],    ['random number', 'dice'],
-	// joke
-	['tell me a joke', 'joke'],   ['make me laugh', 'joke'],    ['funny joke', 'joke'],
-	['give me a joke', 'joke'],   ['say something funny', 'joke'],
-	// weather
-	['weather in', 'weather'],    ['weather at', 'weather'],    ["what's the weather", 'weather'],
-	['temperature in', 'weather'], ['forecast for', 'weather'], ['how hot is', 'weather'],
-	['how cold is', 'weather'],
-	// wiki
-	['search wikipedia', 'wiki'], ['look up', 'wiki'],          ['wikipedia', 'wiki'],
-	['wiki ', 'wiki'],            ['who is ', 'wiki'],          ['what is ', 'wiki'],
-	['define ', 'wiki'],          ['tell me about ', 'wiki'],   ['explain ', 'wiki'],
-	['history of ', 'wiki'],      ['what are ', 'wiki'],
-	// trans
-	['translate this', 'trans'],  ['translate ', 'trans'],      ['how do you say', 'trans'],
-	['in japanese', 'trans'],     ['in korean', 'trans'],       ['in spanish', 'trans'],
-	['in french', 'trans'],       ['in tagalog', 'trans'],      ['in arabic', 'trans'],
-	// music
-	['play the song', 'music'],   ['download song', 'music'],   ['play music', 'music'],
-	['find the song', 'music'],   ['music for', 'music'],
-	// say / tts
-	['text to speech', 'say'],    ['tts ', 'say'],              ['read aloud', 'say'],
-	['say this', 'say'],          ['speak this', 'say'],        ['voice this', 'say'],
-	// time
-	['what time is it', 'time'],  ['current time', 'time'],     ['what is the time', 'time'],
-	// uptime
-	['uptime', 'up'],             ['how long have you been running', 'up'], ['bot uptime', 'up'],
-	// calc
-	['calculate ', 'calc'],       ['solve ', 'calc'],           ['compute ', 'calc'],
-	['what is ', 'calc'],         ['math ', 'calc'],
-	// screenshot
-	['screenshot of', 'screenshot'], ['take a screenshot', 'screenshot'], ['screengrab', 'screenshot'],
-	// wallpaper
-	['wallpaper of', 'wallpaper'], ['random wallpaper', 'wallpaper'], ['desktop background', 'wallpaper'],
-	// meme
-	['send me a meme', 'meme'],   ['random meme', 'meme'],      ['give me a meme', 'meme'],
-	// quote
-	['inspire me', 'quote'],      ['random quote', 'quote'],    ['motivational quote', 'quote'],
-	['give me a quote', 'quote'],
-	// advice
-	['give me advice', 'advice'], ['need advice', 'advice'],    ['what should i do', 'advice'],
-	// funfact
-	['fun fact', 'funfact'],      ['random fact', 'funfact'],   ['interesting fact', 'funfact'],
-	['did you know', 'funfact'],
-	// quiz
-	['quiz me', 'quiz'],          ['trivia question', 'quiz'],  ['give me a quiz', 'quiz'],
-	// uid
-	['my user id', 'uid'],        ['what is my id', 'uid'],     ['my telegram id', 'uid'],
-	// stalk
-	['user info', 'stalk'],       ['who is this user', 'stalk'], ['lookup user', 'stalk'],
-	// bible
-	['bible verse', 'bible'],     ['scripture', 'bible'],       ['verse of the day', 'bible'],
-	// waifu
-	['random waifu', 'waifu'],    ['anime picture', 'waifu'],   ['send me a waifu', 'waifu'],
-	// animeme
-	['anime meme', 'animeme'],    ['send anime meme', 'animeme'],
-	// catfact
-	['cat fact', 'catfact'],      ['tell me about cats', 'catfact'],
-	// dog
-	['dog picture', 'dog'],       ['random dog', 'dog'],        ['send me a dog', 'dog'],
-	// recipe
-	['recipe for', 'recipe'],     ['how to cook', 'recipe'],    ['how do i make', 'recipe'],
-	// zodiac
-	['zodiac compatibility', 'zodiac'], ['horoscope', 'zodiac'], ['star sign', 'zodiac'],
-	// rps
-	['rock paper scissors', 'rps'], ['play rps', 'rps'],
-	// wordle
-	['play wordle', 'wordle'],    ['wordle game', 'wordle'],
-	// generatepass
-	['generate a password', 'generatepass'], ['random password', 'generatepass'],
-	['strong password', 'generatepass'],
-	// devname
-	['generate username', 'devname'], ['random username', 'devname'],
-	// poll
-	['create a poll', 'poll'],    ['make a poll', 'poll'],
-	// imagine
-	['generate an image', 'imagine'], ['create an image', 'imagine'], ['draw ', 'imagine'],
-	['make an image', 'imagine'],
-	// remind
-	['remind me', 'remind'],      ['set a reminder', 'remind'], ['remember to', 'remind'],
-	// ip
-	['look up ip', 'ip'],         ['ip address info', 'ip'],    ['check ip', 'ip'],
-	// premium
-	['request premium', 'requestpremium'], ['premium access', 'requestpremium'],
-	// spotify
-	['spotify ', 'spotify'],      ['find on spotify', 'spotify'],
-	// stats
-	['bot stats', 'status'],      ['system status', 'status'],  ['bot info', 'status'],
-];
 
 function findSimilarCommand(body) {
 	const lower = body.toLowerCase();
 
-	for (const [phrase, cmdName] of INTENT_MAP) {
-		if (lower.includes(phrase) && global.Reze.commands.has(cmdName))
-			return { name: cmdName, score: 100 };
-	}
-
+	// Fully dynamic: uses only currently loaded commands + their meta (name, aliases, description)
+	// No hardcoded INTENT_MAP — new commands are automatically supported
 	const userWords = new Set((lower.match(/\b\w{3,}\b/g) || []));
+
 	let best = null, bestScore = 0;
 
 	for (const [, cmd] of global.Reze.commands) {
@@ -360,9 +266,9 @@ function findSimilarCommand(body) {
 		if (type === 'hidden' || cat === 'hidden') continue;
 
 		let score = 0;
-		if (lower.includes(m.name)) score += 18;
+		if (lower.includes(m.name)) score += 25;           // boosted for dynamic name match
 		for (const alias of (m.aliases || []))
-			if (lower.includes(alias)) score += 14;
+			if (lower.includes(alias)) score += 20;        // boosted for alias match
 
 		const descWords = (m.description || '').toLowerCase().match(/\b\w{4,}\b/g) || [];
 		for (const w of descWords)
@@ -371,7 +277,7 @@ function findSimilarCommand(body) {
 		if (score > bestScore) { bestScore = score; best = m.name; }
 	}
 
-	return bestScore >= 12 ? { name: best, score: bestScore } : null;
+	return bestScore >= 15 ? { name: best, score: bestScore } : null;
 }
 
 function naturalDelay(loadingText = '') {
@@ -459,8 +365,8 @@ async function processWithReze({ bot, chatId, senderID, from, body, response, ev
 	const doneMatch    = reply.match(/^DONE:\s*(.+)$/mi);
 	const msgMatch     = reply.match(/^MESSAGE:\s*([\s\S]+?)(?=\nEXECUTE:|\nLOADING:|\nDONE:|$)/mi);
 
-	// ── Similarity fallback ────────────────────────────────────────────────
-	if (!execMatch && similarMatch && similarMatch.score >= 80) {
+	// ── Similarity fallback (still works perfectly because similarity is now 100% dynamic)
+	if (!execMatch && similarMatch && similarMatch.score >= 40) {
 		const cmd = global.Reze.commands.get(similarMatch.name);
 		if (cmd) {
 			let forcedLoading = null, forcedDone = null;

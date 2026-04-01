@@ -20,8 +20,8 @@ export const meta = {
 export async function onStart({ event, args, response, usage, api }) {
   if (!args.length) return usage();
 
-  const apiUrl = api.shin;
-  if (!apiUrl) return response.reply("⚠️ API URL not configured (global.Reze.api.shin).");
+  const apiUrl = api.ajiro;
+  if (!apiUrl) return response.reply("⚠️ AJIRO API URL not configured.");
 
   try {
     const isClear = args[0].toLowerCase() === "clear";
