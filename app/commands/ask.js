@@ -2,7 +2,6 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import validUrl from 'valid-url';
 
 const API_ENDPOINT = "https://shizuai.vercel.app/chat";
 const CLEAR_ENDPOINT = "https://shizuai.vercel.app/chat/clear";
@@ -24,6 +23,17 @@ export const meta = {
   category: 'ai',
 };
 
+/* ================= URL CHECK ================= */
+
+const isValidUrl = (str) => {
+  try {
+    new URL(str);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 /* ================= FORMAT TEXT ================= */
 
 const formatCoolText = (text) => {
@@ -33,7 +43,7 @@ const formatCoolText = (text) => {
     .replace(/Heck\.ai/gi, "Christus")
     .replace(/Aryan/gi, "Christus")
     .replace(/Shizu AI|Shizuka AI|Shizuka|Shizu/gi, "Christus AI")
-    .replace(/\*(.*?)\*/g, (_, p1) => `_${p1}_`); // italique simple
+    .replace(/\*(.*?)\*/g, (_, p1) => `_${p1}_`);
 };
 
 /* ================= DOWNLOAD ================= */
@@ -77,7 +87,7 @@ const handleAI = async ({
 
   /* ===== IMAGE FROM URL ===== */
   const urlMatch = userInput.match(/(https?:\/\/[^\s]+)/)?.[0];
-  if (urlMatch && validUrl.isWebUri(urlMatch)) {
+  if (urlMatch && isValidUrl(urlMatch)) {
     imageUrl = urlMatch;
     userInput = userInput.replace(urlMatch, '').trim();
   }
@@ -162,4 +172,4 @@ export async function onChat(ctx) {
   }
 
   return handleAI(ctx);
-}
+      }
