@@ -1,64 +1,165 @@
+import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import validUrl from 'valid-url';
+
+const API_ENDPOINT = "https://shizuai.vercel.app/chat";
+const CLEAR_ENDPOINT = "https://shizuai.vercel.app/chat/clear";
+const TMP_DIR = path.join(process.cwd(), 'tmp');
+
+if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR);
+
+/* ================= META ================= */
+
 export const meta = {
-  name: 'ask',
-  aliases: ['ai', 'chat'],
-  version: '1.0.0',
-  author: 'AjiroDesu',
-  description: 'Chat directly with Reze AI.',
+  name: 'ai',
+  aliases: [],
+  version: '2.2.0',
+  author: 'Christus',
+  description: 'Chat with Christus AI (image, audio, video supported)',
   guide: ['<message>'],
   cooldown: 3,
   type: 'anyone',
   category: 'ai',
 };
 
-export async function onStart({ args, response, config, groq, senderID, from, bot, chatId, usage }) {
-  if (!args.length) return usage();
-  if (!groq) return response.reply('⚠️ Groq API key not configured. Add `groqKey` to `json/config.json`.');
+/* ================= FORMAT TEXT ================= */
 
-  const userMessage = args.join(' ');
+const formatCoolText = (text) => {
+  if (!text) return "";
 
-  if (!global.Reze.aiConversations.has(senderID)) global.Reze.aiConversations.set(senderID, []);
-  const history = global.Reze.aiConversations.get(senderID);
+  return text
+    .replace(/Heck\.ai/gi, "Christus")
+    .replace(/Aryan/gi, "Christus")
+    .replace(/Shizu AI|Shizuka AI|Shizuka|Shizu/gi, "Christus AI")
+    .replace(/\*(.*?)\*/g, (_, p1) => `_${p1}_`); // italique simple
+};
 
-  history.push({ role: 'user', content: userMessage });
-  if (history.length > 20) history.splice(0, history.length - 20);
+/* ================= DOWNLOAD ================= */
+
+const downloadFile = async (url, ext) => {
+  const filePath = path.join(TMP_DIR, `${uuidv4()}.${ext}`);
+  const res = await axios.get(url, { responseType: 'arraybuffer' });
+  fs.writeFileSync(filePath, Buffer.from(res.data));
+  return filePath;
+};
+
+/* ================= RESET ================= */
+
+const resetConversation = async (response, senderID) => {
+  try {
+    await axios.delete(`${CLEAR_ENDPOINT}/${senderID}`);
+    return response.reply("✅ Conversation reset.");
+  } catch {
+    return response.reply("❌ Reset failed.");
+  }
+};
+
+/* ================= AI HANDLER ================= */
+
+const handleAI = async ({
+  args,
+  response,
+  senderID,
+  event
+}) => {
+  let userInput = args.join(' ').trim();
+  let imageUrl = null;
 
   await response.action('typing');
 
-  try {
-    const systemPrompt = global.Reze.buildSystemPrompt
-      ? global.Reze.buildSystemPrompt()
-      : `You are Reze, a helpful Telegram bot assistant. Developer: ${config.developer || 'AjiroDesu'}. Current time: ${new Date().toLocaleString('en-US', { timeZone: config.timezone || 'UTC' })}.`;
-
-    const res = await groq.chat.completions.create({
-      model: config.groqModel || 'llama-3.3-70b-versatile',
-      max_tokens: 512,
-      messages: [{ role: 'system', content: systemPrompt }, ...history],
-    });
-    const reply = res.choices[0]?.message?.content?.trim() || '🤔 I had trouble generating a response.';
-    history.push({ role: 'assistant', content: reply });
-
-    const execMatch = reply.match(/^EXECUTE:\s*(.+)$/mi);
-    const msgMatch  = reply.match(/^MESSAGE:\s*([\s\S]+?)(?=EXECUTE:|$)/mi);
-
-    if (execMatch) {
-      const cmdStr  = execMatch[1].trim();
-      const userMsg = msgMatch ? msgMatch[1].trim() : `Running \`${cmdStr}\` for you...`;
-      await response.reply(userMsg);
-      await global.Reze.processWithReze({
-        bot,
-        chatId,
-        senderID,
-        from,
-        body: cmdStr,
-        response,
-        event: { message: { text: cmdStr, from, chat: { id: chatId, type: 'private' } } },
-      });
-      return;
-    }
-
-    const clean = reply.replace(/^EXECUTE:[^\n]*\n?/gmi, '').replace(/^MESSAGE:\s*/gmi, '').trim();
-    await response.reply(clean || '🤔 I had trouble generating a response. Please try again.');
-  } catch (e) {
-    await response.reply(`⚠️ Groq AI error: ${e.message}`);
+  /* ===== IMAGE FROM REPLY ===== */
+  if (event?.message?.reply_to_message?.photo) {
+    const photo = event.message.reply_to_message.photo;
+    imageUrl = photo[photo.length - 1]?.file_id;
   }
+
+  /* ===== IMAGE FROM URL ===== */
+  const urlMatch = userInput.match(/(https?:\/\/[^\s]+)/)?.[0];
+  if (urlMatch && validUrl.isWebUri(urlMatch)) {
+    imageUrl = urlMatch;
+    userInput = userInput.replace(urlMatch, '').trim();
+  }
+
+  if (!userInput && !imageUrl) {
+    return response.reply("💬 Provide a message or image.");
+  }
+
+  try {
+    const res = await axios.post(API_ENDPOINT, {
+      uid: senderID,
+      message: userInput,
+      image_url: imageUrl
+    }, { timeout: 60000 });
+
+    const {
+      reply,
+      image_url,
+      music_data,
+      video_data,
+      shotti_data
+    } = res.data;
+
+    const finalText = formatCoolText(reply);
+
+    const files = [];
+
+    if (image_url) files.push(await downloadFile(image_url, 'jpg'));
+    if (music_data?.downloadUrl) files.push(await downloadFile(music_data.downloadUrl, 'mp3'));
+    if (video_data?.downloadUrl) files.push(await downloadFile(video_data.downloadUrl, 'mp4'));
+    if (shotti_data?.videoUrl) files.push(await downloadFile(shotti_data.videoUrl, 'mp4'));
+
+    await response.reply({
+      text: finalText,
+      files: files.length ? files : undefined
+    });
+
+  } catch (e) {
+    return response.reply("⚠️ AI Error.");
+  }
+};
+
+/* ================= START ================= */
+
+export async function onStart(ctx) {
+  const { args, response, senderID } = ctx;
+
+  if (!args.length) return response.reply("❗ Enter a message.");
+
+  const input = args.join(' ').toLowerCase();
+
+  if (['clear', 'reset'].includes(input)) {
+    return resetConversation(response, senderID);
+  }
+
+  return handleAI(ctx);
+}
+
+/* ================= REPLY ================= */
+
+export async function onReply(ctx) {
+  const { senderID, Reply } = ctx;
+  if (senderID !== Reply?.author) return;
+  return handleAI(ctx);
+}
+
+/* ================= NO PREFIX ================= */
+
+export async function onChat(ctx) {
+  const { event } = ctx;
+
+  const body = event?.message?.text?.trim();
+  if (!body?.toLowerCase().startsWith('ai ')) return;
+
+  const input = body.slice(3).trim();
+  if (!input) return;
+
+  ctx.args = input.split(/\s+/);
+
+  if (['clear', 'reset'].includes(input.toLowerCase())) {
+    return resetConversation(ctx.response, ctx.senderID);
+  }
+
+  return handleAI(ctx);
 }
